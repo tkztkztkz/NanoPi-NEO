@@ -148,7 +148,12 @@ public:
 				tInfo.pin	= pin;
 				tInfo.func	= func;
 				tInfo.fd	= ::open( (strPath+"value").c_str(), O_RDWR | O_NONBLOCK);
-				tInfo.prevValue = tInfo.value = tInfo.prevCnt = 0;
+#ifndef GPIO_BUTTON_POLARITY_INVERT
+				tInfo.prevValue = tInfo.value = 0;
+#else
+				tInfo.prevValue = tInfo.value = 1;
+#endif
+				tInfo.prevCnt = 0;
 
 				if( tInfo.fd < 0 )
 				{
@@ -224,7 +229,11 @@ public:
 				ptInfo->prevCnt++;
 				if (ptInfo->prevCnt >= 2) {
 					ptInfo->value = ptInfo->prevValue;
+#ifndef GPIO_BUTTON_POLARITY_INVERT
 					it.second.func( ptInfo->value );
+#else
+					it.second.func( ptInfo->value ? 0 : 1 );
+#endif
 				}
 			}else{
 				ptInfo->prevCnt = 0;

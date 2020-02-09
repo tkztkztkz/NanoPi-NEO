@@ -45,13 +45,24 @@ Volumio(Debian):
 #include "MusicControllerVolumioSIO.hpp"
 #include "MenuController.hpp"
 
+
 #ifndef GPIO_BUTTON_ROTATE
- #define GPIO_BUTTON_PREV 0
- #define GPIO_BUTTON_NEXT 3
- #define GPIO_BUTTON_PLAY 2
+ #ifndef GPIO_BUTTON_PREV
+  #define GPIO_BUTTON_PREV 0
+ #endif
+ #ifndef GPIO_BUTTON_NEXT
+  #define GPIO_BUTTON_NEXT 3
+ #endif
+ #ifndef GPIO_BUTTON_PLAY
+  #define GPIO_BUTTON_PLAY 2
+ #endif
  #ifdef GPIO_5BUTTON // NasPi DAC LCD Panel compatible
-  #define GPIO_BUTTON_UP   203
-  #define GPIO_BUTTON_DOWN 198
+  #ifndef GPIO_BUTTON_UP
+   #define GPIO_BUTTON_UP   203
+  #endif
+  #ifndef GPIO_BUTTON_DOWN
+   #define GPIO_BUTTON_DOWN 198
+  #endif
  #endif
 #else
  #define GPIO_BUTTON_PREV 198
@@ -62,6 +73,7 @@ Volumio(Debian):
   #define GPIO_BUTTON_DOWN 3
  #endif
 #endif
+
 
 #include <map>
 #include <string>
