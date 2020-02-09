@@ -428,6 +428,16 @@ int MusicControllerVolumioSIO::addToQueue (std::string &uri)
 	return emitVolumio("addToQueue", "uri", uri);
 }
 
+int MusicControllerVolumioSIO::createPlayList (std::string &name)
+{
+	initPushHandler("pushCreatePlaylist");
+	emitVolumio("createPlaylist", "name", name);
+	waitPushHandler("pushCreatePlaylist");
+
+	return 0;
+}
+
+
 int MusicControllerVolumioSIO::emitVolumio(std::string cmd)
 {
 	// emit
@@ -521,6 +531,21 @@ int MusicControllerVolumioSIO::addWebRadio(std::string name, std::string uri)
 	return 0;
 }
 
+int MusicControllerVolumioSIO::addToPlaylist(std::string name, std::string service, std::string uri)
+{
+	sio::message::ptr send_data(sio::object_message::create());
+	std::map<std::string, sio::message::ptr>& map = send_data->get_map();
+	map.insert(std::make_pair("name", sio::string_message::create(name)));
+	map.insert(std::make_pair("service", sio::string_message::create(service)));
+	map.insert(std::make_pair("uri", sio::string_message::create(uri)));
+
+	initPushHandler("pushAddToPlaylist");
+	m_v2sio.socket()->emit("addToPlaylist", send_data);
+	waitPushHandler("pushAddToPlaylist");
+
+	return 0;
+}
+
 // "endpoint":"audio_interface/alsa_controller", "method":"saveAlsaOptions"}
 int MusicControllerVolumioSIO::callMethod(std::string endpoint, std::string method, sio::message::ptr data)
 {
@@ -565,6 +590,42 @@ std::vector<MusicList> MusicControllerVolumioSIO::browseLibrary (std::string &ur
 	}
 
 	return list;
+}
+
+
+int MusicControllerVolumioSIO::initPushHandler(std::string tag)
+{
+	std::lock_guard<std::mutex> lock(m_mtx);
+	if (m_iPushHnd.count(tag) == 0) {
+		m_iPushHnd[tag].isRecv = false;
+		m_v2sio.socket()->on(tag, [&](sio::event &ev) {
+			std::cout << ev.get_name() << std::endl;
+			sio::message::ptr msg = ev.get_message();
+			std::lock_guard<std::mutex> lock(m_mtx);
+			m_iPushHnd[ev.get_name()].isRecv = true;
+	        });
+	}
+	m_iPushHnd[tag].isRecv = false;
+	m_iPushHnd[tag].status = -1;
+
+	return 0;
+}
+int MusicControllerVolumioSIO::waitPushHandler(std::string tag)
+{
+	int ret = -1;
+        // sync data
+        for (int i = 0; i < 50; i++) {
+                {
+                        std::lock_guard<std::mutex> lock(m_mtx);
+                        if (m_iPushHnd[tag].isRecv){
+				ret = m_iPushHnd[tag].status;
+                                break;
+                        }
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+
+	return ret;
 }
 
 class MenuMusicLib : public MenuList
@@ -650,6 +711,7 @@ public:
 		addmenu(new MenuMusicLib(" -albums", m_iCtl, iMusic, "albums://"));
 		addmenu(new MenuMusicLib(" -genres", m_iCtl, iMusic, "genres://"));
 		addmenu(new MenuMusicLib("Web Radio", m_iCtl, iMusic, "radio", true));
+		menulists.push_back("Create Playlist");
 		menulists.push_back("Update DB");
 		menulists.push_back("Rescan DB");
 	}
@@ -666,10 +728,36 @@ public:
 			break;
 
 			case 6:
-			m_iMusic->emitVolumio("updateDb");
+			{
+				int num = 0;
+				std::string playlist;
+				std::vector<std::string> iList;
+				m_iMusic->getPlayLists(iList);
+				int dup;
+				do { // check playlist name duplication
+					dup = false;
+					char cplaylist[32] = {0};
+					snprintf(cplaylist, sizeof(cplaylist)-1, "playlist_%05d", num++);
+					playlist = cplaylist;
+					for (auto it: iList) 
+						if (it == playlist) { dup = true; continue; }
+				} while(dup);
+				m_iMusic->createPlayList(playlist);
+				std::vector<std::map<std::string, std::string>> iQueue;
+				m_iMusic->getQueue(iQueue);
+				for (auto it: iQueue) {
+					std::cout << "addToPlaylist: " << playlist << " : " << it["uri"] << std::endl;
+					m_iMusic->addToPlaylist(playlist, it["service"], it["uri"]);
+				}
+//				m_iMusic->emitVolumio("listPlaylist");
+			}	
 			break;
 
 			case 7:
+			m_iMusic->emitVolumio("updateDb");
+			break;
+
+			case 8:
 			m_iMusic->emitVolumio("rescanDb");
 			break;
 

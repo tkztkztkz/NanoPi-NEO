@@ -36,6 +36,12 @@ private:
 	std::chrono::system_clock::time_point m_iPrevPollTime;
 	int m_iCoverartRetryCnt;
 
+	struct pushHandler {
+		bool isRecv;
+		int  status;
+	};
+	std::map<std::string, pushHandler> m_iPushHnd;
+
 public:
 	MusicControllerVolumioSIO();
 	int connect();
@@ -49,6 +55,9 @@ public:
 	int getPlayPos();
 	int setPlayQueue(int index);
 	int setPlayList (int index);
+	int createPlayList (std::string &name);
+	int addToPlaylist(std::string name, std::string service, std::string uri);
+
 
 	// volumio specific fuction(Music Library)
 	int emitVolumio(std::string cmd);
@@ -64,6 +73,9 @@ public:
 
 	bool m_isConnected;
 	void pollEvent();
+
+	int initPushHandler(std::string tag);
+	int waitPushHandler(std::string tag);
 
 private:
 	int callMethod(std::string endpoint, std::string method, sio::message::ptr data);
